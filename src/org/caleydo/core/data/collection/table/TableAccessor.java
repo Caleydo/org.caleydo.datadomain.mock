@@ -10,9 +10,13 @@ package org.caleydo.core.data.collection.table;
  *
  */
 public class TableAccessor {
-	public static void postProcess(NumericalTable table) {
-		table.setMin(0);
-		table.setMax(1);
+	public static void postProcess(NumericalTable table, double min, double max) {
+		table.setMin(min);
+		table.setMax(max);
+		postProcess(table);
+	}
+
+	public static void postProcess(Table table) {
 		table.normalize();
 		table.createDefaultDimensionPerspectives();
 		table.createDefaultRecordPerspectives();

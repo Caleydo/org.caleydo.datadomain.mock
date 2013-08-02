@@ -5,11 +5,14 @@
  ******************************************************************************/
 package org.caleydo.datadomain.mock;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 
 import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.XmlType;
 
+import org.apache.commons.lang.ArrayUtils;
 import org.caleydo.core.data.collection.EDataClass;
 import org.caleydo.core.data.collection.EDataType;
 import org.caleydo.core.data.collection.column.CategoricalColumn;
@@ -17,23 +20,33 @@ import org.caleydo.core.data.collection.column.NumericalColumn;
 import org.caleydo.core.data.collection.column.container.CategoricalClassDescription;
 import org.caleydo.core.data.collection.column.container.CategoricalContainer;
 import org.caleydo.core.data.collection.column.container.FloatContainer;
+import org.caleydo.core.data.collection.column.container.IntContainer;
+import org.caleydo.core.data.collection.table.CategoricalTable;
 import org.caleydo.core.data.collection.table.NumericalTable;
+import org.caleydo.core.data.collection.table.Table;
 import org.caleydo.core.data.collection.table.TableAccessor;
 import org.caleydo.core.data.datadomain.ATableBasedDataDomain;
 import org.caleydo.core.data.datadomain.DataDomainManager;
+import org.caleydo.core.data.perspective.table.TablePerspective;
+import org.caleydo.core.data.perspective.variable.Perspective;
+import org.caleydo.core.data.perspective.variable.PerspectiveInitializationData;
+import org.caleydo.core.data.virtualarray.VirtualArray;
 import org.caleydo.core.id.IDCreator;
 import org.caleydo.core.id.IDTypeInitializer;
 import org.caleydo.core.io.DataDescription;
 import org.caleydo.core.io.DataSetDescription;
 import org.caleydo.core.io.IDSpecification;
+import org.caleydo.core.io.NumericalProperties;
 import org.caleydo.core.util.color.Color;
 import org.caleydo.core.util.color.ColorBrewer;
 
+import com.google.common.primitives.Ints;
+
 /**
  * a mock data domain use factory methods to create some data
- * 
+ *
  * @author Samuel Gratzl
- * 
+ *
  */
 @XmlType
 @XmlRootElement
@@ -71,11 +84,39 @@ public class MockDataDomain extends ATableBasedDataDomain {
 		}
 
 		dataDomain.setTable(table);
-		TableAccessor.postProcess(table);
+		TableAccessor.postProcess(table, 0, 1);
 
 		return dataDomain;
 	}
 
+	public static MockDataDomain createNumericalInteger(int numCols, int numRows, Random r, int max) {
+		DataSetDescription dataSetDescription = createDataSetDecription();
+		dataSetDescription.setDataDescription(createNumericalIntegerDataDecription(max));
+		DataDescription dataDescription = dataSetDescription.getDataDescription();
+		MockDataDomain dataDomain = createDataDomain(dataSetDescription);
+
+		NumericalTable table = new NumericalTable(dataDomain);
+
+		table.setDataCenter(0.0);
+
+
+		for (int i = 0; i < numCols; ++i) {
+			IntContainer container = new IntContainer(numRows);
+			NumericalColumn<IntContainer, Integer> column = new NumericalColumn<>(dataDescription);
+			column.setRawData(container);
+			for (int j = 0; j < numRows; ++j) {
+				container.add(r.nextInt(max));
+			}
+			table.addColumn(column);
+		}
+
+		dataDomain.setTable(table);
+		TableAccessor.postProcess(table, 0, max);
+
+		return dataDomain;
+	}
+
+	@SuppressWarnings("unchecked")
 	public static MockDataDomain createCategorical(int numCols, int numRows, Random r, String... categories) {
 		DataSetDescription dataSetDescription = createDataSetDecription();
 		dataSetDescription.setDataDescription(createCategoricalDataDecription(categories));
@@ -83,9 +124,9 @@ public class MockDataDomain extends ATableBasedDataDomain {
 		DataDescription dataDescription = dataSetDescription.getDataDescription();
 		MockDataDomain dataDomain = createDataDomain(dataSetDescription);
 
-		NumericalTable table = new NumericalTable(dataDomain);
+		CategoricalTable<String> table = new CategoricalTable<>(dataDomain);
 
-		table.setDataCenter(0.0);
+		table.setCategoryDescritions((CategoricalClassDescription<String>) dataDescription.getCategoricalClassDescription());
 
 		for (int i = 0; i < numCols; ++i) {
 			CategoricalContainer<String> container = new CategoricalContainer<>(numRows, EDataType.STRING, null);
@@ -101,6 +142,67 @@ public class MockDataDomain extends ATableBasedDataDomain {
 		TableAccessor.postProcess(table);
 
 		return dataDomain;
+	}
+
+	public static TablePerspective addRecGrouping(MockDataDomain dataDomain, int... groups) {
+		return addGrouping(dataDomain, true, groups);
+	}
+
+	public static TablePerspective addDimGrouping(MockDataDomain dataDomain, int... groups) {
+		return addGrouping(dataDomain, false, groups);
+	}
+
+	private static TablePerspective addGrouping(MockDataDomain dataDomain, boolean isRecord, int... groups) {
+		Table table = dataDomain.getTable();
+		int total = isRecord ? table.depth() : table.size();
+		int sum = sum(groups);
+		if (sum < total)
+			groups = ArrayUtils.add(groups, total - sum); // fill out
+		else if (sum > total)
+			throw new IllegalStateException("have more groups that items");
+
+		PerspectiveInitializationData data = new PerspectiveInitializationData();
+		data.setLabel(groups.length + " grouping");
+		VirtualArray va = (isRecord ? table.getDefaultRecordPerspective(false) : table
+				.getDefaultDimensionPerspective(false)).getVirtualArray();
+
+		List<Integer> samples = new ArrayList<>();
+		int acc = 0;
+		for (int group : groups) {
+			samples.add(va.get(acc));
+			acc += group;
+		}
+		data.setData(new ArrayList<>(va.getIDs()), Ints.asList(groups), samples);
+
+		return registerAndGet(dataDomain, isRecord, data);
+	}
+
+	private static TablePerspective registerAndGet(MockDataDomain dataDomain, boolean isRecord,
+			PerspectiveInitializationData data) {
+		Table table = dataDomain.getTable();
+		Perspective p = new Perspective(dataDomain, isRecord ? dataDomain.getRecordIDType()
+				: dataDomain.getDimensionIDType());
+		p.init(data);
+		if (isRecord) {
+			table.registerRecordPerspective(p);
+			return dataDomain.getTablePerspective(p.getPerspectiveID(), table.getDefaultDimensionPerspective(false)
+					.getPerspectiveID());
+		} else {
+			table.registerDimensionPerspective(p);
+			return dataDomain.getTablePerspective(table.getDefaultRecordPerspective(false).getPerspectiveID(),
+					p.getPerspectiveID());
+		}
+	}
+
+	/**
+	 * @param groups
+	 * @return
+	 */
+	private static int sum(int[] groups) {
+		int sum = 0;
+		for (int g : groups)
+			sum += g;
+		return sum;
 	}
 
 	private static MockDataDomain createDataDomain(DataSetDescription dataSetDescription) {
@@ -128,6 +230,14 @@ public class MockDataDomain extends ATableBasedDataDomain {
 
 	private static DataDescription createNumericalDataDecription() {
 		DataDescription d = new DataDescription(EDataClass.REAL_NUMBER, EDataType.FLOAT);
+		return d;
+	}
+
+	private static DataDescription createNumericalIntegerDataDecription(int max) {
+		DataDescription d = new DataDescription(EDataClass.NATURAL_NUMBER, EDataType.INTEGER);
+		NumericalProperties numericalProperties = new NumericalProperties();
+		numericalProperties.setMax(Float.valueOf(max));
+		d.setNumericalProperties(numericalProperties);
 		return d;
 	}
 
