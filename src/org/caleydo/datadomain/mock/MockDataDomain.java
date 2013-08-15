@@ -62,8 +62,16 @@ public class MockDataDomain extends ATableBasedDataDomain {
 				+ IDCreator.createPersistentID(MockDataDomain.class));
 	}
 
+	/**
+	 * create a new numerical data domain of the given size
+	 *
+	 * @param numCols
+	 * @param numRows
+	 * @param r
+	 * @return
+	 */
 	public static MockDataDomain createNumerical(int numCols, int numRows, Random r) {
-		DataSetDescription dataSetDescription = createDataSetDecription();
+		DataSetDescription dataSetDescription = createDataSetDecription(r);
 		dataSetDescription.setDataDescription(createNumericalDataDecription());
 
 		DataDescription dataDescription = dataSetDescription.getDataDescription();
@@ -89,8 +97,17 @@ public class MockDataDomain extends ATableBasedDataDomain {
 		return dataDomain;
 	}
 
+	/**
+	 * create a new numerical integer data domain of the given size
+	 *
+	 * @param numCols
+	 * @param numRows
+	 * @param r
+	 * @param max
+	 * @return
+	 */
 	public static MockDataDomain createNumericalInteger(int numCols, int numRows, Random r, int max) {
-		DataSetDescription dataSetDescription = createDataSetDecription();
+		DataSetDescription dataSetDescription = createDataSetDecription(r);
 		dataSetDescription.setDataDescription(createNumericalIntegerDataDecription(max));
 		DataDescription dataDescription = dataSetDescription.getDataDescription();
 		MockDataDomain dataDomain = createDataDomain(dataSetDescription);
@@ -116,9 +133,19 @@ public class MockDataDomain extends ATableBasedDataDomain {
 		return dataDomain;
 	}
 
+	/**
+	 * create a new categorical homogeneous data domain with the given size and categories
+	 *
+	 * @param numCols
+	 * @param numRows
+	 * @param r
+	 * @param categories
+	 *            a list of possible categories
+	 * @return
+	 */
 	@SuppressWarnings("unchecked")
 	public static MockDataDomain createCategorical(int numCols, int numRows, Random r, String... categories) {
-		DataSetDescription dataSetDescription = createDataSetDecription();
+		DataSetDescription dataSetDescription = createDataSetDecription(r);
 		dataSetDescription.setDataDescription(createCategoricalDataDecription(categories));
 
 		DataDescription dataDescription = dataSetDescription.getDataDescription();
@@ -144,21 +171,40 @@ public class MockDataDomain extends ATableBasedDataDomain {
 		return dataDomain;
 	}
 
+	/**
+	 * create and register a new record grouping using the given group sizes
+	 *
+	 * @param dataDomain
+	 * @param groups
+	 *            the group sizes if the sum if less that the number of records the last group will be automatically
+	 *            computed
+	 * @return a table perspective with the new perspective and the default one
+	 */
 	public static TablePerspective addRecGrouping(MockDataDomain dataDomain, int... groups) {
-		return addGrouping(dataDomain, true, groups);
+		return addGrouping(dataDomain, true, true, groups);
+	}
+
+	public TablePerspective addRecGrouping(boolean fillOut, int... groups) {
+		return addGrouping(this, true, fillOut, groups);
 	}
 
 	public static TablePerspective addDimGrouping(MockDataDomain dataDomain, int... groups) {
-		return addGrouping(dataDomain, false, groups);
+		return addGrouping(dataDomain, false, true, groups);
 	}
 
-	private static TablePerspective addGrouping(MockDataDomain dataDomain, boolean isRecord, int... groups) {
+	public TablePerspective addDimGrouping(boolean fillOut, int... groups) {
+		return addGrouping(this, false, fillOut, groups);
+	}
+
+	private static TablePerspective addGrouping(MockDataDomain dataDomain, boolean isRecord, boolean fillOut,
+			int... groups) {
 		Table table = dataDomain.getTable();
 		int total = isRecord ? table.depth() : table.size();
 		int sum = sum(groups);
-		if (sum < total)
+		if (sum < total && fillOut) {
 			groups = ArrayUtils.add(groups, total - sum); // fill out
-		else if (sum > total)
+			sum = total;
+		} else if (sum > total)
 			throw new IllegalStateException("have more groups that items");
 
 		PerspectiveInitializationData data = new PerspectiveInitializationData();
@@ -172,7 +218,7 @@ public class MockDataDomain extends ATableBasedDataDomain {
 			samples.add(va.get(acc));
 			acc += group;
 		}
-		data.setData(new ArrayList<>(va.getIDs()), Ints.asList(groups), samples);
+		data.setData(new ArrayList<>(va.getIDs().subList(0, sum)), Ints.asList(groups), samples);
 
 		return registerAndGet(dataDomain, isRecord, data);
 	}
@@ -217,7 +263,7 @@ public class MockDataDomain extends ATableBasedDataDomain {
 		return dataDomain;
 	}
 
-	private static DataSetDescription createDataSetDecription() {
+	private static DataSetDescription createDataSetDecription(Random r) {
 		DataSetDescription d = new DataSetDescription();
 		d.setColor(Color.BLUE.brighter());
 		d.setDataSetName("Mock");
