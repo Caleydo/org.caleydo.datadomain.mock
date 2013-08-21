@@ -53,6 +53,20 @@ import com.google.common.primitives.Ints;
 public class MockDataDomain extends ATableBasedDataDomain {
 	public final static String DATA_DOMAIN_TYPE = "org.caleydo.datadomain.mock";
 
+	public static final AValueFactory RANDOM = new AValueFactory() {
+		private final Random r = new Random();
+
+		@Override
+		public int nextInt(int n) {
+			return r.nextInt(n);
+		}
+
+		@Override
+		public float nextFloat() {
+			return r.nextFloat();
+		}
+	};
+
 	/**
 	 * Constructor.
 	 */
@@ -70,7 +84,7 @@ public class MockDataDomain extends ATableBasedDataDomain {
 	 * @param r
 	 * @return
 	 */
-	public static MockDataDomain createNumerical(int numCols, int numRows, Random r) {
+	public static MockDataDomain createNumerical(int numCols, int numRows, AValueFactory r) {
 		DataSetDescription dataSetDescription = createDataSetDecription(r);
 		dataSetDescription.setDataDescription(createNumericalDataDecription());
 
@@ -79,7 +93,7 @@ public class MockDataDomain extends ATableBasedDataDomain {
 
 		NumericalTable table = new NumericalTable(dataDomain);
 
-		table.setDataCenter(0.0);
+		table.setDataCenter(r.getCenter());
 
 		for (int i = 0; i < numCols; ++i) {
 			FloatContainer container = new FloatContainer(numRows);
@@ -92,7 +106,7 @@ public class MockDataDomain extends ATableBasedDataDomain {
 		}
 
 		dataDomain.setTable(table);
-		TableAccessor.postProcess(table, 0, 1);
+		TableAccessor.postProcess(table, r.getMin(), r.getMax());
 
 		return dataDomain;
 	}
@@ -106,7 +120,7 @@ public class MockDataDomain extends ATableBasedDataDomain {
 	 * @param max
 	 * @return
 	 */
-	public static MockDataDomain createNumericalInteger(int numCols, int numRows, Random r, int max) {
+	public static MockDataDomain createNumericalInteger(int numCols, int numRows, AValueFactory r, int max) {
 		DataSetDescription dataSetDescription = createDataSetDecription(r);
 		dataSetDescription.setDataDescription(createNumericalIntegerDataDecription(max));
 		DataDescription dataDescription = dataSetDescription.getDataDescription();
@@ -144,7 +158,7 @@ public class MockDataDomain extends ATableBasedDataDomain {
 	 * @return
 	 */
 	@SuppressWarnings("unchecked")
-	public static MockDataDomain createCategorical(int numCols, int numRows, Random r, String... categories) {
+	public static MockDataDomain createCategorical(int numCols, int numRows, AValueFactory r, String... categories) {
 		DataSetDescription dataSetDescription = createDataSetDecription(r);
 		dataSetDescription.setDataDescription(createCategoricalDataDecription(categories));
 
@@ -263,7 +277,7 @@ public class MockDataDomain extends ATableBasedDataDomain {
 		return dataDomain;
 	}
 
-	private static DataSetDescription createDataSetDecription(Random r) {
+	private static DataSetDescription createDataSetDecription(AValueFactory r) {
 		DataSetDescription d = new DataSetDescription();
 		d.setColor(Color.BLUE.brighter());
 		d.setDataSetName("Mock");
