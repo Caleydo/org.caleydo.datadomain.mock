@@ -15,6 +15,7 @@ import javax.xml.bind.annotation.XmlType;
 import org.apache.commons.lang.ArrayUtils;
 import org.caleydo.core.data.collection.EDataClass;
 import org.caleydo.core.data.collection.EDataType;
+import org.caleydo.core.data.collection.EDimension;
 import org.caleydo.core.data.collection.column.CategoricalColumn;
 import org.caleydo.core.data.collection.column.NumericalColumn;
 import org.caleydo.core.data.collection.column.container.CategoricalClassDescription;
@@ -170,7 +171,8 @@ public class MockDataDomain extends ATableBasedDataDomain {
 		table.setCategoryDescritions((CategoricalClassDescription<String>) dataDescription.getCategoricalClassDescription());
 
 		for (int i = 0; i < numCols; ++i) {
-			CategoricalContainer<String> container = new CategoricalContainer<>(numRows, EDataType.STRING, null);
+			CategoricalContainer<String> container = new CategoricalContainer<>(numRows, EDataType.STRING,
+					CategoricalContainer.UNKNOWN_CATEOGRY_STRING);
 			CategoricalColumn<String> column = new CategoricalColumn<>(dataDescription);
 			column.setRawData(container);
 			for (int j = 0; j < numRows; ++j) {
@@ -195,25 +197,25 @@ public class MockDataDomain extends ATableBasedDataDomain {
 	 * @return a table perspective with the new perspective and the default one
 	 */
 	public static TablePerspective addRecGrouping(MockDataDomain dataDomain, int... groups) {
-		return addGrouping(dataDomain, true, true, groups);
+		return addGrouping(dataDomain, EDimension.RECORD, true, groups);
 	}
 
 	public TablePerspective addRecGrouping(boolean fillOut, int... groups) {
-		return addGrouping(this, true, fillOut, groups);
+		return addGrouping(this, EDimension.RECORD, fillOut, groups);
 	}
 
 	public static TablePerspective addDimGrouping(MockDataDomain dataDomain, int... groups) {
-		return addGrouping(dataDomain, false, true, groups);
+		return addGrouping(dataDomain, EDimension.DIMENSION, true, groups);
 	}
 
 	public TablePerspective addDimGrouping(boolean fillOut, int... groups) {
-		return addGrouping(this, false, fillOut, groups);
+		return addGrouping(this, EDimension.DIMENSION, fillOut, groups);
 	}
 
-	private static TablePerspective addGrouping(MockDataDomain dataDomain, boolean isRecord, boolean fillOut,
+	private static TablePerspective addGrouping(MockDataDomain dataDomain, EDimension dim, boolean fillOut,
 			int... groups) {
 		Table table = dataDomain.getTable();
-		int total = isRecord ? table.depth() : table.size();
+		int total = dim.select(table.size(), table.depth());
 		int sum = sum(groups);
 		if (sum < total && fillOut) {
 			groups = ArrayUtils.add(groups, total - sum); // fill out
@@ -223,7 +225,7 @@ public class MockDataDomain extends ATableBasedDataDomain {
 
 		PerspectiveInitializationData data = new PerspectiveInitializationData();
 		data.setLabel(groups.length + " grouping");
-		VirtualArray va = (isRecord ? table.getDefaultRecordPerspective(false) : table
+		VirtualArray va = (dim.isRecord() ? table.getDefaultRecordPerspective(false) : table
 				.getDefaultDimensionPerspective(false)).getVirtualArray();
 
 		List<Integer> samples = new ArrayList<>();
@@ -234,16 +236,16 @@ public class MockDataDomain extends ATableBasedDataDomain {
 		}
 		data.setData(new ArrayList<>(va.getIDs().subList(0, sum)), Ints.asList(groups), samples);
 
-		return registerAndGet(dataDomain, isRecord, data);
+		return registerAndGet(dataDomain, dim, data);
 	}
 
-	private static TablePerspective registerAndGet(MockDataDomain dataDomain, boolean isRecord,
+	private static TablePerspective registerAndGet(MockDataDomain dataDomain, EDimension dim,
 			PerspectiveInitializationData data) {
 		Table table = dataDomain.getTable();
-		Perspective p = new Perspective(dataDomain, isRecord ? dataDomain.getRecordIDType()
+		Perspective p = new Perspective(dataDomain, dim.isRecord() ? dataDomain.getRecordIDType()
 				: dataDomain.getDimensionIDType());
 		p.init(data);
-		if (isRecord) {
+		if (dim.isRecord()) {
 			table.registerRecordPerspective(p);
 			return dataDomain.getTablePerspective(p.getPerspectiveID(), table.getDefaultDimensionPerspective(false)
 					.getPerspectiveID());
@@ -279,11 +281,11 @@ public class MockDataDomain extends ATableBasedDataDomain {
 
 	private static DataSetDescription createDataSetDecription(AValueFactory r) {
 		DataSetDescription d = new DataSetDescription();
-		d.setColor(Color.BLUE.brighter());
-		d.setDataSetName("Mock");
+		d.setColor(r.nextColor());
+		d.setDataSetName("Mock" + r.nextString());
 		d.setTransposeMatrix(false);
-		d.setColumnIDSpecification(new IDSpecification("mock_col", "mock_col"));
-		d.setRowIDSpecification(new IDSpecification("mock_row", "mock_row"));
+		d.setColumnIDSpecification(new IDSpecification(r.getIDCategory(EDimension.DIMENSION), r.getIDType(EDimension.DIMENSION)));
+		d.setRowIDSpecification(new IDSpecification(r.getIDCategory(EDimension.RECORD), r.getIDType(EDimension.RECORD)));
 
 		return d;
 	}
