@@ -171,7 +171,8 @@ public class MockDataDomain extends ATableBasedDataDomain {
 		table.setCategoryDescritions((CategoricalClassDescription<String>) dataDescription.getCategoricalClassDescription());
 
 		for (int i = 0; i < numCols; ++i) {
-			CategoricalContainer<String> container = new CategoricalContainer<>(numRows, EDataType.STRING, null);
+			CategoricalContainer<String> container = new CategoricalContainer<>(numRows, EDataType.STRING,
+					CategoricalContainer.UNKNOWN_CATEOGRY_STRING);
 			CategoricalColumn<String> column = new CategoricalColumn<>(dataDescription);
 			column.setRawData(container);
 			for (int j = 0; j < numRows; ++j) {
@@ -280,7 +281,7 @@ public class MockDataDomain extends ATableBasedDataDomain {
 
 	private static DataSetDescription createDataSetDecription(AValueFactory r) {
 		DataSetDescription d = new DataSetDescription();
-		d.setColor(r.nextColor().brighter());
+		d.setColor(r.nextColor());
 		d.setDataSetName("Mock" + r.nextString());
 		d.setTransposeMatrix(false);
 		d.setColumnIDSpecification(new IDSpecification(r.getIDCategory(EDimension.DIMENSION), r.getIDType(EDimension.DIMENSION)));
